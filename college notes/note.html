@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1020">
+  <title>NotePilot | Note Details</title>
+  <meta name="description" content="Read, download, and review detailed study notes. Join the comment discussion, bookmark resources, and access PDF previews on NotePilot.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="./assets/logo.svg">
+  <link rel="stylesheet" href="./css/style.css?v=1.1">
+  <script src="./js/env.js"></script>
+</head>
+<body data-page="note">
+  <div class="app-shell">
+    <aside id="sidebarShell" class="sidebar-shell"></aside>
+    <div class="app-content-shell">
+      <header id="topbarShell" class="topbar-shell"></header>
+      <main class="page note-page">
+        <section class="card note-hero">
+          <div>
+            <span id="noteBadge" class="badge-soft">Loading...</span>
+            <h1 id="noteTitle">Note details</h1>
+            <p id="noteDescription" class="note-description">Loading note description...</p>
+            <div id="noteTags" class="tag-row"></div>
+          </div>
+          <div class="note-hero-actions">
+            <button id="likeButton" class="button button-secondary" type="button">Like</button>
+            <button id="saveButton" class="button button-secondary" type="button">Bookmark</button>
+            <a id="openPdfButton" class="button button-primary" href="#" target="_blank" rel="noopener noreferrer">Open PDF</a>
+            <a id="downloadPdfButton" class="button button-ghost" href="#" target="_blank" rel="noopener noreferrer">Download PDF</a>
+          </div>
+        </section>
+
+        <section class="note-layout">
+          <div class="note-preview card">
+            <div class="section-heading compact">
+              <div>
+                <span class="eyebrow">Preview</span>
+                <h2>PDF preview</h2>
+              </div>
+            </div>
+            <div id="previewFallback" class="empty-state compact hidden">
+              <h3>Preview unavailable</h3>
+              <p>Use the open or download button to access this note file.</p>
+            </div>
+            <iframe id="notePreviewFrame" title="PDF preview" loading="lazy"></iframe>
+          </div>
+
+          <aside class="note-sidebar">
+            <article class="card detail-card">
+              <span class="eyebrow">Metadata</span>
+              <div class="detail-list">
+                <div><span>Subject</span><strong id="detailSubject">-</strong></div>
+                <div><span>Semester</span><strong id="detailSemester">-</strong></div>
+                <div><span>Category</span><strong id="detailCategory">-</strong></div>
+                <div><span>Uploaded</span><strong id="detailDate">-</strong></div>
+                <div><span>Likes</span><strong id="detailLikes">0</strong></div>
+                <div><span>Bookmarks</span><strong id="detailBookmarks">0</strong></div>
+                <div><span>Downloads</span><strong id="detailDownloads">0</strong></div>
+              </div>
+            </article>
+
+            <article class="card detail-card">
+              <span class="eyebrow">Uploader</span>
+              <div class="uploader-card">
+                <div id="uploaderAvatar" class="profile-avatar"></div>
+                <div>
+                  <strong id="uploaderName">-</strong>
+                  <p id="uploaderEmail" class="muted-copy">-</p>
+                </div>
+              </div>
+            </article>
+          </aside>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Discussion</span>
+              <h2>Comments</h2>
+            </div>
+          </div>
+          <form id="commentForm" class="card comment-form">
+            <label class="input-group">
+              <span>Add a comment</span>
+              <textarea id="commentText" rows="4" placeholder="Share context, corrections, or extra tips for this note." required></textarea>
+            </label>
+            <button class="button button-primary" type="submit">Post Comment</button>
+          </form>
+          <div id="commentsList" class="comments-list"></div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Keep exploring</span>
+              <h2>Related notes</h2>
+            </div>
+          </div>
+          <div id="relatedNotesGrid" class="notes-grid"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="./js/note.js"></script>
+</body>
+</html>

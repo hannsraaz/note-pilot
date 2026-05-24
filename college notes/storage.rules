@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isValidPdfUpload() {
+      return request.resource != null
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size < 25 * 1024 * 1024;
+    }
+
+    match /notes/{userId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+        && (request.resource == null || isValidPdfUpload());
+    }
+  }
+}

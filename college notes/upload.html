@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1020">
+  <title>NotePilot | Upload</title>
+  <meta name="description" content="Publish your PDF college notes to NotePilot. Share study sets, course guides, and exam preparation material with your campus.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="./assets/logo.svg">
+  <link rel="stylesheet" href="./css/style.css?v=1.1">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="./js/env.js"></script>
+</head>
+<body data-page="upload">
+  <div class="app-shell">
+    <aside id="sidebarShell" class="sidebar-shell"></aside>
+    <div class="app-content-shell">
+      <header id="topbarShell" class="topbar-shell"></header>
+      <main class="page upload-page">
+        <section class="section-block upload-layout">
+          <div class="upload-main">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Publish notes</span>
+                <h1>Upload a new PDF study pack</h1>
+              </div>
+            </div>
+
+            <form id="uploadForm" class="card upload-form-card">
+              <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload PDF dropzone">
+                <input id="pdfFile" name="pdfFile" type="file" accept="application/pdf" hidden required>
+                <div class="dropzone-icon">PDF</div>
+                <h3>Drop your PDF here</h3>
+                <p>or click to choose a file from your device</p>
+                <span id="selectedFileName" class="dropzone-file-label">No file selected yet</span>
+              </div>
+
+              <div class="form-grid-two">
+                <label class="input-group">
+                  <span>Title</span>
+                  <input name="title" type="text" placeholder="Operating Systems Midterm Notes" required>
+                </label>
+                <label class="input-group">
+                  <span>Subject</span>
+                  <input name="subject" type="text" placeholder="Operating Systems" required>
+                </label>
+              </div>
+
+              <div class="form-grid-three">
+                <label class="input-group">
+                  <span>Semester</span>
+                  <select id="uploadSemester" name="semester" required></select>
+                </label>
+                <label class="input-group">
+                  <span>Category</span>
+                  <select id="uploadCategory" name="category" required></select>
+                </label>
+                <label class="input-group">
+                  <span>Tags</span>
+                  <input name="tags" type="text" placeholder="midterm, revision, concise">
+                </label>
+              </div>
+
+              <label class="input-group">
+                <span>Description</span>
+                <textarea name="description" rows="5" placeholder="Tell other students what this note covers, how complete it is, and when it is useful." required></textarea>
+              </label>
+
+              <div class="upload-actions">
+                <button class="button button-primary" type="submit">Upload Note</button>
+              </div>
+            </form>
+          </div>
+
+          <aside class="upload-sidebar">
+            <article class="card status-card">
+              <span class="eyebrow">Upload status</span>
+              <h3 id="storageStatusTitle">Google Drive ready</h3>
+              <p id="storageStatusText">Choose a PDF and publish it directly to Google Drive with Firestore metadata.</p>
+              <div class="progress-shell">
+                <div id="uploadProgressBar" class="progress-bar"></div>
+              </div>
+              <div id="uploadProgressText" class="progress-copy">0% complete</div>
+            </article>
+
+            <article class="card checklist-card">
+              <span class="eyebrow">Best results</span>
+              <ul class="checklist">
+                <li>Use clean, readable PDFs with clear titles.</li>
+                <li>Add useful tags so others can discover your notes quickly.</li>
+                <li>Keep descriptions practical and specific for better saves and likes.</li>
+              </ul>
+            </article>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="./js/upload.js"></script>
+</body>
+</html>

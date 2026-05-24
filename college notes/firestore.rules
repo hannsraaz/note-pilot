@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isNoteUploader(noteId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/notes/$(noteId)).data.uploaderId == request.auth.uid;
+    }
+
+    function affectsOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function incrementedByOne(field) {
+      return request.resource.data[field] == resource.data[field] + 1;
+    }
+
+    function changedByOne(field) {
+      return request.resource.data[field] == resource.data[field] + 1 ||
+        request.resource.data[field] == resource.data[field] - 1;
+    }
+
+    match /notes/{noteId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.uploaderId == request.auth.uid;
+      allow update: if isNoteUploader(noteId)
+        || (signedIn() && affectsOnly(['likeCount', 'updatedAt']) && changedByOne('likeCount'))
+        || (signedIn() && affectsOnly(['bookmarkCount', 'updatedAt']) && changedByOne('bookmarkCount'))
+        || (signedIn() && affectsOnly(['commentCount', 'updatedAt']) && changedByOne('commentCount'))
+        || (affectsOnly(['downloadCount', 'updatedAt']) && incrementedByOne('downloadCount'));
+      allow delete: if isNoteUploader(noteId);
+    }
+
+    match /notes/{noteId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if signedIn() &&
+        (resource.data.userId == request.auth.uid || isNoteUploader(noteId));
+      allow update: if false;
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    match /users/{userId}/{subcollection}/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.noteId == documentId;
+      allow update: if false;
+    }
+  }
+}
