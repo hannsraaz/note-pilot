@@ -328,7 +328,7 @@ export async function getUserProfile(uid, env, idToken) {
 export async function listAllNotes(env) {
   const base = getFirestoreBase(env);
   const url = `${base}/notes?pageSize=100&key=${env.FIREBASE_API_KEY}`;
-  const res = await firestoreFetch(url, {}, idToken);
+  const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();
   const docs = data.documents || [];
