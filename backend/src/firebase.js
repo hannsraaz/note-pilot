@@ -11,6 +11,14 @@ function getFirestoreBase(env) {
   return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 }
 
+function firestoreFetch(url, options = {}, idToken) {
+  const headers = new Headers(options.headers || {});
+  if (idToken) {
+    headers.set("Authorization", `Bearer ${idToken}`);
+  }
+  return fetch(url, { ...options, headers });
+}
+
 // ==========================================
 // Firestore REST Value Converters
 // ==========================================
@@ -109,7 +117,7 @@ export async function signUpWithEmail(email, password, displayName, env) {
     email: data.email,
     displayName: displayName || "Student",
     photoURL: ""
-  }, env);
+  }, env, data.idToken);
 
   return {
     user: {
@@ -142,7 +150,7 @@ export async function signInWithEmail(email, password, env) {
     email: data.email,
     displayName: data.displayName || "Student",
     photoURL: data.photoUrl || ""
-  }, env);
+  }, env, data.idToken);
 
   return {
     user: {
@@ -181,7 +189,7 @@ export async function signInWithGoogle(token, origin, env) {
     email: data.email,
     displayName: data.displayName || "Student",
     photoURL: data.photoUrl || ""
-  }, env);
+  }, env, data.idToken);
 
   return {
     user: {
@@ -263,11 +271,11 @@ export async function refreshIdToken(refreshToken, env) {
 // Firestore Document and User Operations
 // ==========================================
 
-export async function syncUserProfile(uid, payload, env) {
+export async function syncUserProfile(uid, payload, env, idToken) {
   const base = getFirestoreBase(env);
   const now = new Date().toISOString();
 
-  const existing = await getUserProfile(uid, env);
+  const existing = await getUserProfile(uid, env, idToken);
 
   const fields = {
     uid,
@@ -280,19 +288,19 @@ export async function syncUserProfile(uid, payload, env) {
   };
 
   const url = `${base}/users/${uid}?key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url, {
+  const res = await firestoreFetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields: toFirestoreFields(fields) })
-  });
+  }, idToken);
 
   return res.ok;
 }
 
-export async function getUserProfile(uid, env) {
+export async function getUserProfile(uid, env, idToken) {
   const base = getFirestoreBase(env);
   const url = `${base}/users/${uid}?key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url);
+  const res = await firestoreFetch(url, {}, idToken);
   if (!res.ok) return null;
   const doc = await res.json();
   return fromFirestoreDoc(doc);
@@ -305,7 +313,7 @@ export async function getUserProfile(uid, env) {
 export async function listAllNotes(env) {
   const base = getFirestoreBase(env);
   const url = `${base}/notes?pageSize=100&key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url);
+  const res = await firestoreFetch(url, {}, idToken);
   if (!res.ok) return [];
   const data = await res.json();
   const docs = data.documents || [];
@@ -362,7 +370,7 @@ export async function getNoteById(noteId, env) {
   return fromFirestoreDoc(doc);
 }
 
-export async function createNote(noteInput, uploadMeta, user, env) {
+export async function createNote(noteInput, uploadMeta, user, env, idToken) {
   const base = getFirestoreBase(env);
   const now = new Date().toISOString();
 
@@ -404,11 +412,11 @@ export async function createNote(noteInput, uploadMeta, user, env) {
   };
 
   const url = `${base}/notes?key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url, {
+  const res = await firestoreFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields: toFirestoreFields(noteData) })
-  });
+  }, idToken);
 
   if (!res.ok) {
     const err = await res.json();
@@ -419,7 +427,7 @@ export async function createNote(noteInput, uploadMeta, user, env) {
   return fromFirestoreDoc(createdDoc);
 }
 
-export async function updateNote(noteId, payload, userId, env) {
+export async function updateNote(noteId, payload, userId, env, idToken) {
   const existing = await getNoteById(noteId, env);
   if (!existing) {
     throw new Error("Note not found.");
@@ -453,11 +461,11 @@ export async function updateNote(noteId, payload, userId, env) {
   const mask = Object.keys(updateFields).map((k) => `updateMask.fieldPaths=${k}`).join("&");
   const url = `${base}/notes/${noteId}?${mask}&key=${env.FIREBASE_API_KEY}`;
 
-  const res = await fetch(url, {
+  const res = await firestoreFetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields: toFirestoreFields(updateFields) })
-  });
+  }, idToken);
 
   if (!res.ok) {
     const err = await res.json();
@@ -467,7 +475,7 @@ export async function updateNote(noteId, payload, userId, env) {
   return true;
 }
 
-export async function deleteNote(noteId, userId, env) {
+export async function deleteNote(noteId, userId, env, idToken) {
   const existing = await getNoteById(noteId, env);
   if (!existing) return true;
   if (existing.uploaderId !== userId) {
@@ -477,12 +485,12 @@ export async function deleteNote(noteId, userId, env) {
   // Delete comments subcollection first
   const comments = await listComments(noteId, env);
   for (const comment of comments) {
-    await deleteComment(noteId, comment.id, userId, env, true);
+    await deleteComment(noteId, comment.id, userId, env, true, idToken);
   }
 
   const base = getFirestoreBase(env);
   const url = `${base}/notes/${noteId}?key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url, { method: "DELETE" });
+  const res = await firestoreFetch(url, { method: "DELETE" }, idToken);
   return res.ok;
 }
 
@@ -490,13 +498,13 @@ export async function deleteNote(noteId, userId, env) {
 // Engagement: Like, Save, Download Counters
 // ==========================================
 
-export async function getUserEngagement(noteId, userId, env) {
+export async function getUserEngagement(noteId, userId, env, idToken) {
   if (!userId) return { liked: false, saved: false };
 
   const base = getFirestoreBase(env);
   const [likeRes, saveRes] = await Promise.all([
-    fetch(`${base}/users/${userId}/likedNotes/${noteId}?key=${env.FIREBASE_API_KEY}`),
-    fetch(`${base}/users/${userId}/savedNotes/${noteId}?key=${env.FIREBASE_API_KEY}`)
+    firestoreFetch(`${base}/users/${userId}/likedNotes/${noteId}?key=${env.FIREBASE_API_KEY}`, {}, idToken),
+    firestoreFetch(`${base}/users/${userId}/savedNotes/${noteId}?key=${env.FIREBASE_API_KEY}`, {}, idToken)
   ]);
 
   return {
@@ -505,89 +513,89 @@ export async function getUserEngagement(noteId, userId, env) {
   };
 }
 
-export async function toggleLikeNote(noteId, userId, env) {
+export async function toggleLikeNote(noteId, userId, env, idToken) {
   const base = getFirestoreBase(env);
   const note = await getNoteById(noteId, env);
   if (!note) throw new Error("Note not found.");
 
   const checkUrl = `${base}/users/${userId}/likedNotes/${noteId}?key=${env.FIREBASE_API_KEY}`;
-  const checkRes = await fetch(checkUrl);
+  const checkRes = await firestoreFetch(checkUrl, {}, idToken);
   const alreadyLiked = checkRes.status === 200;
 
   if (alreadyLiked) {
     // Unlike
-    await fetch(checkUrl, { method: "DELETE" });
+    await firestoreFetch(checkUrl, { method: "DELETE" }, idToken);
     const newLikes = Math.max(0, (note.likeCount || 1) - 1);
-    await updateNoteFields(noteId, { likeCount: newLikes, updatedAt: new Date().toISOString() }, env);
+    await updateNoteFields(noteId, { likeCount: newLikes, updatedAt: new Date().toISOString() }, env, idToken);
     return false;
   } else {
     // Like
-    await fetch(checkUrl, {
+    await firestoreFetch(checkUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fields: toFirestoreFields({ noteId, createdAt: new Date().toISOString() })
       })
-    });
+    }, idToken);
     const newLikes = (note.likeCount || 0) + 1;
-    await updateNoteFields(noteId, { likeCount: newLikes, updatedAt: new Date().toISOString() }, env);
+    await updateNoteFields(noteId, { likeCount: newLikes, updatedAt: new Date().toISOString() }, env, idToken);
     return true;
   }
 }
 
-export async function toggleSaveNote(noteId, userId, env) {
+export async function toggleSaveNote(noteId, userId, env, idToken) {
   const base = getFirestoreBase(env);
   const note = await getNoteById(noteId, env);
   if (!note) throw new Error("Note not found.");
 
   const checkUrl = `${base}/users/${userId}/savedNotes/${noteId}?key=${env.FIREBASE_API_KEY}`;
-  const checkRes = await fetch(checkUrl);
+  const checkRes = await firestoreFetch(checkUrl, {}, idToken);
   const alreadySaved = checkRes.status === 200;
 
   if (alreadySaved) {
     // Unsave
-    await fetch(checkUrl, { method: "DELETE" });
+    await firestoreFetch(checkUrl, { method: "DELETE" }, idToken);
     const newCount = Math.max(0, (note.bookmarkCount || 1) - 1);
-    await updateNoteFields(noteId, { bookmarkCount: newCount, updatedAt: new Date().toISOString() }, env);
+    await updateNoteFields(noteId, { bookmarkCount: newCount, updatedAt: new Date().toISOString() }, env, idToken);
     return false;
   } else {
     // Save
-    await fetch(checkUrl, {
+    await firestoreFetch(checkUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fields: toFirestoreFields({ noteId, createdAt: new Date().toISOString() })
       })
-    });
+    }, idToken);
     const newCount = (note.bookmarkCount || 0) + 1;
-    await updateNoteFields(noteId, { bookmarkCount: newCount, updatedAt: new Date().toISOString() }, env);
+    await updateNoteFields(noteId, { bookmarkCount: newCount, updatedAt: new Date().toISOString() }, env, idToken);
     return true;
   }
 }
 
-export async function recordDownload(noteId, env) {
+export async function recordDownload(noteId, env, idToken) {
   const note = await getNoteById(noteId, env);
   if (!note) return;
   const newCount = (note.downloadCount || 0) + 1;
-  await updateNoteFields(noteId, { downloadCount: newCount, updatedAt: new Date().toISOString() }, env);
+  await updateNoteFields(noteId, { downloadCount: newCount, updatedAt: new Date().toISOString() }, env, idToken);
 }
 
-async function updateNoteFields(noteId, fields, env) {
+async function updateNoteFields(noteId, fields, env, idToken) {
   const base = getFirestoreBase(env);
   const mask = Object.keys(fields).map((k) => `updateMask.fieldPaths=${k}`).join("&");
   const url = `${base}/notes/${noteId}?${mask}&key=${env.FIREBASE_API_KEY}`;
-  await fetch(url, {
+  await firestoreFetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields: toFirestoreFields(fields) })
-  });
+  }, idToken);
 }
 
 // ==========================================
 // Comments Operations
 // ==========================================
 
-export async function listComments(noteId, env) {
+export async function listComments(noteId, env, idToken) {
   const base = getFirestoreBase(env);
   const url = `${base}/notes/${noteId}/comments?pageSize=100&key=${env.FIREBASE_API_KEY}`;
   const res = await fetch(url);
@@ -605,7 +613,7 @@ export async function listComments(noteId, env) {
   return comments;
 }
 
-export async function addComment(noteId, text, user, env) {
+export async function addComment(noteId, text, user, env, idToken) {
   const commentText = (text || "").trim();
   if (!commentText) throw new Error("Write a comment before submitting.");
 
@@ -622,11 +630,11 @@ export async function addComment(noteId, text, user, env) {
   };
 
   const url = `${base}/notes/${noteId}/comments?key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url, {
+  const res = await firestoreFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields: toFirestoreFields(commentData) })
-  });
+  }, idToken);
 
   if (!res.ok) {
     throw new Error("Failed to post comment.");
@@ -636,19 +644,19 @@ export async function addComment(noteId, text, user, env) {
   const note = await getNoteById(noteId, env);
   if (note) {
     const newCount = (note.commentCount || 0) + 1;
-    await updateNoteFields(noteId, { commentCount: newCount, updatedAt: now }, env);
+    await updateNoteFields(noteId, { commentCount: newCount, updatedAt: now }, env, idToken);
   }
 
   const created = await res.json();
   return fromFirestoreDoc(created);
 }
 
-export async function deleteComment(noteId, commentId, userId, env, force = false) {
+export async function deleteComment(noteId, commentId, userId, env, force = false, idToken) {
   const base = getFirestoreBase(env);
   const commentUrl = `${base}/notes/${noteId}/comments/${commentId}?key=${env.FIREBASE_API_KEY}`;
 
   if (!force) {
-    const res = await fetch(commentUrl);
+    const res = await firestoreFetch(commentUrl, {}, idToken);
     if (!res.ok) return true;
     const comment = fromFirestoreDoc(await res.json());
     const note = await getNoteById(noteId, env);
@@ -658,12 +666,12 @@ export async function deleteComment(noteId, commentId, userId, env, force = fals
     }
   }
 
-  await fetch(commentUrl, { method: "DELETE" });
+  await firestoreFetch(commentUrl, { method: "DELETE" }, idToken);
 
   const note = await getNoteById(noteId, env);
   if (note) {
     const newCount = Math.max(0, (note.commentCount || 1) - 1);
-    await updateNoteFields(noteId, { commentCount: newCount, updatedAt: new Date().toISOString() }, env);
+    await updateNoteFields(noteId, { commentCount: newCount, updatedAt: new Date().toISOString() }, env, idToken);
   }
 
   return true;
@@ -673,10 +681,10 @@ export async function deleteComment(noteId, commentId, userId, env, force = fals
 // User Saved Notes and Uploads
 // ==========================================
 
-export async function getUserSavedNotes(userId, env) {
+export async function getUserSavedNotes(userId, env, idToken) {
   const base = getFirestoreBase(env);
   const url = `${base}/users/${userId}/savedNotes?pageSize=100&key=${env.FIREBASE_API_KEY}`;
-  const res = await fetch(url);
+  const res = await firestoreFetch(url, {}, idToken);
   if (!res.ok) return [];
   const data = await res.json();
   const docs = data.documents || [];

@@ -190,7 +190,7 @@ export default {
       const userProfileMatch = path.match(/^\/api\/users\/([^/]+)$/);
       if (userProfileMatch && method === "GET") {
         const userId = userProfileMatch[1];
-        const profile = await getUserProfile(userId, env);
+        const profile = await getUserProfile(userId, env, extractBearerToken(request));
         return jsonResponse(profile || {}, 200, request, env);
       }
 
@@ -211,7 +211,7 @@ export default {
           return jsonResponse({ error: "Unauthorized access to saved notes." }, 401, request, env);
         }
 
-        const savedNotes = await getUserSavedNotes(userId, env);
+        const savedNotes = await getUserSavedNotes(userId, env, token);
         return jsonResponse(savedNotes, 200, request, env);
       }
 
@@ -242,7 +242,7 @@ export default {
           return jsonResponse({ error: "Note metadata and upload metadata are required." }, 400, request, env);
         }
 
-        const created = await createNote(body.note, body.uploadMeta, user, env);
+        const created = await createNote(body.note, body.uploadMeta, user, env, token);
         return jsonResponse({ id: created.id, ...created }, 201, request, env);
       }
 
@@ -267,7 +267,7 @@ export default {
           }
 
           const body = await parseBody(request);
-          await updateNote(noteId, body, user.uid, env);
+          await updateNote(noteId, body, user.uid, env, token);
           return jsonResponse({ success: true }, 200, request, env);
         }
 
@@ -278,7 +278,7 @@ export default {
             return jsonResponse({ error: "Unauthorized." }, 401, request, env);
           }
 
-          await deleteNote(noteId, user.uid, env);
+          await deleteNote(noteId, user.uid, env, token);
           return jsonResponse({ success: true }, 200, request, env);
         }
       }
@@ -289,7 +289,7 @@ export default {
         const noteId = engagementMatch[1];
         const token = extractBearerToken(request);
         const user = token ? await verifyUserToken(token, env) : null;
-        const engagement = await getUserEngagement(noteId, user?.uid, env);
+        const engagement = await getUserEngagement(noteId, user?.uid, env, token);
         return jsonResponse(engagement, 200, request, env);
       }
 
@@ -302,7 +302,7 @@ export default {
           return jsonResponse({ error: "Sign in before liking notes." }, 401, request, env);
         }
 
-        const liked = await toggleLikeNote(noteId, user.uid, env);
+        const liked = await toggleLikeNote(noteId, user.uid, env, token);
         return jsonResponse({ liked }, 200, request, env);
       }
 
@@ -315,14 +315,14 @@ export default {
           return jsonResponse({ error: "Sign in before saving notes." }, 401, request, env);
         }
 
-        const saved = await toggleSaveNote(noteId, user.uid, env);
+        const saved = await toggleSaveNote(noteId, user.uid, env, token);
         return jsonResponse({ saved }, 200, request, env);
       }
 
       const downloadMatch = path.match(/^\/api\/notes\/([^/]+)\/download$/);
       if (downloadMatch && method === "POST") {
         const noteId = downloadMatch[1];
-        await recordDownload(noteId, env);
+        await recordDownload(noteId, env, extractBearerToken(request));
         return jsonResponse({ success: true }, 200, request, env);
       }
 
@@ -344,7 +344,7 @@ export default {
           }
 
           const body = await parseBody(request);
-          const comment = await addComment(noteId, body.text, user, env);
+          const comment = await addComment(noteId, body.text, user, env, token);
           return jsonResponse(comment, 201, request, env);
         }
       }
@@ -358,7 +358,7 @@ export default {
           return jsonResponse({ error: "Unauthorized." }, 401, request, env);
         }
 
-        await deleteComment(noteId, commentId, user.uid, env);
+        await deleteComment(noteId, commentId, user.uid, env, false, token);
         return jsonResponse({ success: true }, 200, request, env);
       }
 
