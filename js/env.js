@@ -12,7 +12,7 @@ window.APP_CONFIG = {
 
   // Google Drive OAuth Client ID (Public Web Client ID)
   googleDrive: {
-    clientId: "186193829621-2ludp1od1tn7vbikenpgomhfd8kl33kc.apps.googleusercontent.com"
+    clientId: "857579149979-i5gbc6fnhfdj0lebh56umtllr3nc8goa.apps.googleusercontent.com"
   },
 
   app: {
