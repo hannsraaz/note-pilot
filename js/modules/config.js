@@ -4,6 +4,9 @@ const normalizeSection = (section = {}) => ({ ...section });
 
 export const config = {
   apiUrl: rawConfig.apiUrl || "",
+  googleAuth: {
+    clientId: rawConfig.googleAuth?.clientId || ""
+  },
   firebase: normalizeSection(rawConfig.firebase),
   googleDrive: {
     clientId: rawConfig.googleDrive?.clientId || ""
@@ -26,6 +29,9 @@ export async function loadRemoteConfig() {
     const res = await fetch(`${baseUrl}/api/config`);
     if (res.ok) {
       const data = await res.json();
+      if (data.googleAuthClientId && !config.googleAuth.clientId) {
+        config.googleAuth.clientId = data.googleAuthClientId;
+      }
       if (data.googleDriveClientId && !config.googleDrive.clientId) {
         config.googleDrive.clientId = data.googleDriveClientId;
       }

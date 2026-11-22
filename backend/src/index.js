@@ -75,6 +75,7 @@ export default {
           appName: env.APP_NAME || "NotePilot",
           supportEmail: env.SUPPORT_EMAIL || "support@example.com",
           defaultTheme: env.DEFAULT_THEME || "dark",
+          googleAuthClientId: env.GOOGLE_AUTH_CLIENT_ID || "",
           googleDriveClientId: env.GOOGLE_DRIVE_CLIENT_ID || ""
         },
         200,

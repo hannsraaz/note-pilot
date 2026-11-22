@@ -82,7 +82,7 @@ export function observeAuthState(callback) {
 
 export async function signInWithGoogle() {
   await loadRemoteConfig();
-  const clientId = config.googleDrive.clientId;
+  const clientId = config.googleAuth.clientId;
 
   if (!clientId) {
     throw new Error("Google Client ID is not configured. Add it in js/env.js or backend secrets.");
