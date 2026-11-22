@@ -103,7 +103,9 @@ export async function signUpWithEmail(email, password, displayName, env) {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error?.message || "Failed to create account.");
+    const error = new Error(data.error?.message || "Failed to create account.");
+    error.status = response.status === 400 ? 400 : 502;
+    throw error;
   }
 
   // Update displayName if provided
@@ -141,7 +143,9 @@ export async function signInWithEmail(email, password, env) {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error?.message || "Invalid credentials.");
+    const error = new Error(data.error?.message || "Invalid credentials.");
+    error.status = response.status === 400 ? 401 : 502;
+    throw error;
   }
 
   // Sync profile to Firestore
@@ -181,7 +185,9 @@ export async function signInWithGoogle(token, origin, env) {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error?.message || "Google sign-in failed.");
+    const error = new Error(data.error?.message || "Google sign-in failed.");
+    error.status = response.status === 400 ? 401 : 502;
+    throw error;
   }
 
   await syncUserProfile(data.localId, {
@@ -272,29 +278,38 @@ export async function refreshIdToken(refreshToken, env) {
 // ==========================================
 
 export async function syncUserProfile(uid, payload, env, idToken) {
-  const base = getFirestoreBase(env);
-  const now = new Date().toISOString();
+  try {
+    const base = getFirestoreBase(env);
+    const now = new Date().toISOString();
 
-  const existing = await getUserProfile(uid, env, idToken);
+    const existing = await getUserProfile(uid, env, idToken);
 
-  const fields = {
-    uid,
-    displayName: payload.displayName || existing?.displayName || "Student",
-    email: payload.email || existing?.email || "",
-    photoURL: payload.photoURL || existing?.photoURL || "",
-    providerId: payload.providerId || existing?.providerId || "firebase",
-    lastLoginAt: now,
-    createdAt: existing?.createdAt || now
-  };
+    const fields = {
+      uid,
+      displayName: payload.displayName || existing?.displayName || "Student",
+      email: payload.email || existing?.email || "",
+      photoURL: payload.photoURL || existing?.photoURL || "",
+      providerId: payload.providerId || existing?.providerId || "firebase",
+      lastLoginAt: now,
+      createdAt: existing?.createdAt || now
+    };
 
-  const url = `${base}/users/${uid}?key=${env.FIREBASE_API_KEY}`;
-  const res = await firestoreFetch(url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: toFirestoreFields(fields) })
-  }, idToken);
+    const url = `${base}/users/${uid}?key=${env.FIREBASE_API_KEY}`;
+    const res = await firestoreFetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: toFirestoreFields(fields) })
+    }, idToken);
 
-  return res.ok;
+    if (!res.ok) {
+      console.warn("Unable to sync user profile:", res.status);
+    }
+    return res.ok;
+  } catch (error) {
+    // Profile persistence must not prevent a successful Firebase login.
+    console.warn("User profile sync skipped:", error);
+    return false;
+  }
 }
 
 export async function getUserProfile(uid, env, idToken) {

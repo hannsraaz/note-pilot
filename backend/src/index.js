@@ -370,7 +370,7 @@ export default {
         {
           error: error.message || "An unexpected error occurred."
         },
-        500,
+        error.status || 500,
         request,
         env
       );
