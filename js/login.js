@@ -13,7 +13,21 @@ const heading = document.getElementById("authHeading");
 const subheading = document.getElementById("authSubheading");
 
 function getRedirectTarget() {
-  return getQueryParam("redirect") || "./dashboard.html";
+  const redirect = getQueryParam("redirect");
+  if (!redirect) {
+    return "./dashboard.html";
+  }
+
+  try {
+    const normalized = new URL(redirect, window.location.origin);
+    if (normalized.origin !== window.location.origin) {
+      return "./dashboard.html";
+    }
+
+    return `${normalized.pathname}${normalized.search}${normalized.hash}`;
+  } catch {
+    return "./dashboard.html";
+  }
 }
 
 function showAuthTab(tab) {
