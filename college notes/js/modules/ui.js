@@ -111,7 +111,6 @@ export function renderShell(activeKey) {
     sidebarHost.innerHTML = `
       <aside class="sidebar">
         <a class="brand-lockup" href="./index.html">
-          <img src="./assets/logo.svg" alt="${config.app.name} logo">
           <span>${config.app.name}</span>
         </a>
         <nav class="sidebar-nav">
@@ -133,7 +132,6 @@ export function renderShell(activeKey) {
       <div class="topbar">
         <div class="topbar-left">
           <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-label="Open navigation">|||</button>
-          <div class="topbar-status">Live on Firebase</div>
         </div>
         <div class="topbar-right">
           <div class="topbar-actions">
