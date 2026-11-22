@@ -13,7 +13,26 @@ const heading = document.getElementById("authHeading");
 const subheading = document.getElementById("authSubheading");
 
 function getRedirectTarget() {
-  return getQueryParam("redirect") || "./dashboard.html";
+  const fallback = "./dashboard.html";
+  const redirect = getQueryParam("redirect");
+
+  if (!redirect) {
+    return fallback;
+  }
+
+  try {
+    const targetUrl = new URL(redirect, window.location.origin);
+    const isSameOrigin = targetUrl.origin === window.location.origin;
+    const isHttpProtocol = targetUrl.protocol === "http:" || targetUrl.protocol === "https:";
+
+    if (!isSameOrigin || !isHttpProtocol) {
+      return fallback;
+    }
+
+    return `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
+  } catch {
+    return fallback;
+  }
 }
 
 function showAuthTab(tab) {
