@@ -1,114 +1,168 @@
-import {
-  auth,
-  collection,
-  createUserWithEmailAndPassword,
-  db,
-  doc,
-  getDoc,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  serverTimestamp,
-  setDoc,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  updateProfile
-} from "./firebase.js";
-import { firebaseConfigured, requireFirebaseConfig } from "./config.js";
+/**
+ * NotePilot Authentication Module
+ * Communicates with the Cloudflare Worker backend.
+ * Never stores or exposes Firebase API keys in the browser.
+ */
 
-let currentUser = null;
-let syncPromise = null;
+import { apiRequest, clearStoredSession, getStoredToken, getStoredUser, setStoredSession } from "./api.js";
+import { config, loadRemoteConfig } from "./config.js";
 
-const googleProvider = firebaseConfigured ? new GoogleAuthProvider() : null;
+let currentUser = getStoredUser();
+const authListeners = new Set();
+let authInitialized = false;
 
-if (googleProvider) {
-  googleProvider.setCustomParameters({ prompt: "select_account" });
-}
-
-async function syncUserProfile(user, extra = {}) {
-  if (!db || !user) {
-    return null;
-  }
-
-  if (!syncPromise) {
-    syncPromise = (async () => {
-      const userRef = doc(collection(db, "users"), user.uid);
-      const snapshot = await getDoc(userRef);
-      const payload = {
-        uid: user.uid,
-        displayName: extra.displayName || user.displayName || "Student",
-        email: user.email || "",
-        photoURL: user.photoURL || "",
-        providerId: user.providerData?.[0]?.providerId || "firebase",
-        lastLoginAt: serverTimestamp()
-      };
-
-      if (!snapshot.exists()) {
-        payload.createdAt = serverTimestamp();
-      }
-
-      await setDoc(userRef, payload, { merge: true });
-      return payload;
-    })().finally(() => {
-      syncPromise = null;
-    });
-  }
-
-  return syncPromise;
-}
-
-export function observeAuthState(callback) {
-  if (!firebaseConfigured || !auth) {
-    callback(null);
-    return () => {};
-  }
-
-  return onAuthStateChanged(auth, async (user) => {
-    currentUser = user || null;
-
-    if (user) {
-      await syncUserProfile(user);
+function notifyAuthListeners(user) {
+  currentUser = user;
+  authListeners.forEach((callback) => {
+    try {
+      callback(user);
+    } catch (e) {
+      console.error("Auth listener error:", e);
     }
-
-    callback(user || null);
   });
 }
 
+function loadGsiScript() {
+  return new Promise((resolve, reject) => {
+    if (typeof google !== "undefined" && google.accounts) {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load Google Identity Services.")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Identity Services."));
+    document.head.appendChild(script);
+  });
+}
+
+export function observeAuthState(callback) {
+  authListeners.add(callback);
+
+  // Initial verification on startup
+  (async () => {
+    await loadRemoteConfig();
+
+    const storedToken = getStoredToken();
+    if (!storedToken) {
+      currentUser = null;
+      callback(null);
+      return;
+    }
+
+    try {
+      const data = await apiRequest("/api/auth/me");
+      currentUser = data.user || null;
+      if (!currentUser) {
+        clearStoredSession();
+      }
+      callback(currentUser);
+    } catch {
+      // If server verification fails, session is expired/invalid
+      clearStoredSession();
+      currentUser = null;
+      callback(null);
+    }
+  })();
+
+  return () => {
+    authListeners.delete(callback);
+  };
+}
+
 export async function signInWithGoogle() {
-  requireFirebaseConfig();
-  const result = await signInWithPopup(auth, googleProvider);
-  await syncUserProfile(result.user);
-  currentUser = result.user;
-  return result.user;
+  await loadRemoteConfig();
+  const clientId = config.googleDrive.clientId;
+
+  if (!clientId) {
+    throw new Error("Google Client ID is not configured. Add it in js/env.js or backend secrets.");
+  }
+
+  await loadGsiScript();
+
+  return new Promise((resolve, reject) => {
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: "email profile openid https://www.googleapis.com/auth/drive.file",
+        callback: async (response) => {
+          if (response.error) {
+            reject(new Error(response.error_description || response.error));
+            return;
+          }
+
+          try {
+            const authResult = await apiRequest("/api/auth/google", {
+              method: "POST",
+              body: { idToken: response.access_token }
+            });
+
+            setStoredSession(authResult.token, authResult.refreshToken, authResult.user);
+            notifyAuthListeners(authResult.user);
+
+            // Store Google Drive access token for drive uploads
+            sessionStorage.setItem("google_drive_access_token", response.access_token);
+
+            resolve(authResult.user);
+          } catch (apiError) {
+            reject(apiError);
+          }
+        }
+      });
+
+      client.requestAccessToken({ prompt: "consent" });
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
 export async function signUpWithEmail({ name, email, password }) {
-  requireFirebaseConfig();
-  const credentials = await createUserWithEmailAndPassword(auth, email, password);
+  await loadRemoteConfig();
 
-  if (name?.trim()) {
-    await updateProfile(credentials.user, {
-      displayName: name.trim()
-    });
-  }
+  const authResult = await apiRequest("/api/auth/register", {
+    method: "POST",
+    body: { name, email, password }
+  });
 
-  await syncUserProfile(credentials.user, { displayName: name.trim() });
-  currentUser = credentials.user;
-  return credentials.user;
+  setStoredSession(authResult.token, authResult.refreshToken, authResult.user);
+  notifyAuthListeners(authResult.user);
+  return authResult.user;
 }
 
 export async function signInWithEmail({ email, password }) {
-  requireFirebaseConfig();
-  const credentials = await signInWithEmailAndPassword(auth, email, password);
-  await syncUserProfile(credentials.user);
-  currentUser = credentials.user;
-  return credentials.user;
+  await loadRemoteConfig();
+
+  const authResult = await apiRequest("/api/auth/login", {
+    method: "POST",
+    body: { email, password }
+  });
+
+  setStoredSession(authResult.token, authResult.refreshToken, authResult.user);
+  notifyAuthListeners(authResult.user);
+  return authResult.user;
 }
 
 export async function logoutUser() {
-  requireFirebaseConfig();
-  await signOut(auth);
-  currentUser = null;
+  try {
+    await apiRequest("/api/auth/logout", { method: "POST" });
+  } catch {
+    // Ignore logout request failure, clear local state regardless
+  } finally {
+    clearStoredSession();
+    sessionStorage.removeItem("google_drive_access_token");
+    notifyAuthListeners(null);
+  }
 }
 
 export function getCurrentUser() {
@@ -116,7 +170,6 @@ export function getCurrentUser() {
 }
 
 export async function getUserProfile(userId) {
-  requireFirebaseConfig();
-  const snapshot = await getDoc(doc(collection(db, "users"), userId));
-  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+  if (!userId) return null;
+  return await apiRequest(`/api/users/${userId}`);
 }

@@ -1,6 +1,4 @@
-import { storage } from "./firebase.js";
-import { deleteObject, ref } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-storage.js";
-import { config } from "./config.js";
+import { config, loadRemoteConfig } from "./config.js";
 
 let googleAccessToken = sessionStorage.getItem("google_drive_access_token") || null;
 
@@ -24,7 +22,6 @@ function loadGsiScript() {
       return;
     }
 
-    // Check if the script tag is already in the document to prevent duplicates
     const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
     if (existing) {
       existing.addEventListener("load", () => resolve());
@@ -50,43 +47,41 @@ function loadGsiScript() {
   });
 }
 
-export function authenticateGoogleDrive() {
+export async function authenticateGoogleDrive() {
+  await loadRemoteConfig();
+
+  if (googleAccessToken) {
+    return googleAccessToken;
+  }
+
+  await loadGsiScript();
+
+  if (!config.googleDrive.clientId) {
+    throw new Error("Google Drive Client ID is not configured. Configure it in Cloudflare Worker secrets or js/env.js.");
+  }
+
   return new Promise((resolve, reject) => {
-    if (googleAccessToken) {
-      resolve(googleAccessToken);
-      return;
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: config.googleDrive.clientId,
+        scope: "https://www.googleapis.com/auth/drive.file",
+        callback: (response) => {
+          if (response.error) {
+            reject(new Error(`Google Authentication failed: ${response.error_description || response.error}`));
+            return;
+          }
+          if (response.access_token) {
+            setGoogleDriveToken(response.access_token);
+            resolve(response.access_token);
+          } else {
+            reject(new Error("No access token returned from Google."));
+          }
+        }
+      });
+      client.requestAccessToken({ prompt: "consent" });
+    } catch (error) {
+      reject(error);
     }
-
-    loadGsiScript()
-      .then(() => {
-        if (!config.googleDrive.clientId) {
-          reject(new Error("Google Drive Client ID is not configured. Add it in js/env.js."));
-          return;
-        }
-
-        try {
-          const client = google.accounts.oauth2.initTokenClient({
-            client_id: config.googleDrive.clientId,
-            scope: "https://www.googleapis.com/auth/drive.file",
-            callback: (response) => {
-              if (response.error) {
-                reject(new Error(`Google Authentication failed: ${response.error_description || response.error}`));
-                return;
-              }
-              if (response.access_token) {
-                setGoogleDriveToken(response.access_token);
-                resolve(response.access_token);
-              } else {
-                reject(new Error("No access token returned from Google."));
-              }
-            }
-          });
-          client.requestAccessToken({ prompt: "consent" });
-        } catch (error) {
-          reject(error);
-        }
-      })
-      .catch(reject);
   });
 }
 
@@ -130,7 +125,7 @@ export async function uploadPdfToStorage(file, user, { onProgress } = {}) {
         try {
           const response = JSON.parse(xhr.responseText);
           resolve(response.id);
-        } catch (e) {
+        } catch {
           reject(new Error("Invalid response received from Google Drive API."));
         }
       } else {
@@ -217,7 +212,7 @@ export async function uploadPdfToStorage(file, user, { onProgress } = {}) {
   };
 }
 
-export async function deletePdfFromStorage(storagePath, provider = "firebase") {
+export async function deletePdfFromStorage(storagePath, provider = "google-drive") {
   if (!storagePath) {
     return;
   }
@@ -244,20 +239,5 @@ export async function deletePdfFromStorage(storagePath, provider = "firebase") {
     } catch (error) {
       console.warn("Error calling Google Drive file delete API:", error);
     }
-    return;
-  }
-
-  // Firebase Storage fallback for legacy notes
-  if (!storage) {
-    return;
-  }
-
-  try {
-    await deleteObject(ref(storage, storagePath));
-  } catch (error) {
-    if (error?.code === "storage/object-not-found") {
-      return;
-    }
-    throw new Error(error?.message || "The file could not be deleted from Firebase Storage.");
   }
 }

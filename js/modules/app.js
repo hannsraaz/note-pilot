@@ -1,4 +1,4 @@
-import { firebaseConfigured, getConfigWarnings } from "./config.js";
+import { getConfigWarnings } from "./config.js";
 import { logoutUser, observeAuthState } from "./auth.js";
 import {
   bindShellEvents,
@@ -49,7 +49,7 @@ export function initShellPage(pageKey, { requireAuth = false, onAuthResolved } =
   return observeAuthState(async (user) => {
     updateAuthShell(user);
 
-    if (requireAuth && !user && firebaseConfigured) {
+    if (requireAuth && !user) {
       const redirect = encodeURIComponent(getCurrentPageUrl());
       window.location.href = `./login.html?redirect=${redirect}`;
       return;
@@ -66,7 +66,7 @@ export function initStandalonePage({ redirectIfAuthenticated = false, onAuthReso
   showConfigWarningsOnce();
 
   return observeAuthState(async (user) => {
-    if (redirectIfAuthenticated && user && firebaseConfigured) {
+    if (redirectIfAuthenticated && user) {
       window.location.href = "./dashboard.html";
       return;
     }

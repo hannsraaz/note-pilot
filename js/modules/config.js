@@ -3,6 +3,7 @@ const rawConfig = window.APP_CONFIG || {};
 const normalizeSection = (section = {}) => ({ ...section });
 
 export const config = {
+  apiUrl: rawConfig.apiUrl || "",
   firebase: normalizeSection(rawConfig.firebase),
   googleDrive: {
     clientId: rawConfig.googleDrive?.clientId || ""
@@ -14,36 +15,49 @@ export const config = {
   }
 };
 
-const isFilled = (value) => {
-  if (typeof value !== "string") {
-    return Boolean(value);
+let remoteConfigLoaded = false;
+
+export async function loadRemoteConfig() {
+  if (remoteConfigLoaded) return config;
+
+  try {
+    const { getApiBaseUrl } = await import("./api.js");
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/config`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.googleDriveClientId && !config.googleDrive.clientId) {
+        config.googleDrive.clientId = data.googleDriveClientId;
+      }
+      if (data.appName) config.app.name = data.appName;
+      if (data.supportEmail) config.app.supportEmail = data.supportEmail;
+      remoteConfigLoaded = true;
+    }
+  } catch (err) {
+    // If backend is not currently reachable, local defaults apply
+    console.debug("Backend /api/config not reachable yet:", err);
   }
 
-  const trimmed = value.trim();
-  return trimmed !== "" && !trimmed.startsWith("YOUR_");
-};
-
-export const firebaseConfigured = [
-  "apiKey",
-  "authDomain",
-  "projectId",
-  "storageBucket",
-  "messagingSenderId",
-  "appId"
-].every((key) => isFilled(config.firebase[key]));
+  return config;
+}
 
 export function getConfigWarnings() {
   const warnings = [];
+  const host = window.location.hostname;
 
-  if (!firebaseConfigured) {
-    warnings.push("Firebase configuration is incomplete. Update js/env.js before testing auth, Firestore, and Storage.");
+  // On GitHub Pages or production, if apiUrl is still the dummy placeholder
+  if (
+    host !== "localhost" &&
+    host !== "127.0.0.1" &&
+    (!config.apiUrl || config.apiUrl.includes("YOUR-SUBDOMAIN") || config.apiUrl.includes("example.com"))
+  ) {
+    warnings.push("Cloudflare Worker API URL is not configured. Update js/env.js with your deployed Worker endpoint.");
   }
 
   return warnings;
 }
 
 export function requireFirebaseConfig() {
-  if (!firebaseConfigured) {
-    throw new Error("Firebase is not configured. Update js/env.js with your project credentials.");
-  }
+  // Maintained for backward compatibility
+  return true;
 }

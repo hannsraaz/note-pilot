@@ -1,15 +1,20 @@
+/**
+ * NotePilot Frontend Configuration
+ * SECURE ARCHITECTURE:
+ * Never put secret keys (client_secret, Firebase private keys, passwords) in this file.
+ * All secrets belong strictly in the Cloudflare Worker backend environment (wrangler secret put).
+ */
 window.APP_CONFIG = {
-  firebase: {
-    apiKey: "AIzaSyA1taIGEIbHIH80Ovkxrl2Yo1Hr5OcFklA",
-    authDomain: "notepilot-8ebf4.firebaseapp.com",
-    projectId: "notepilot-8ebf4",
-    storageBucket: "notepilot-8ebf4.firebasestorage.app",
-    messagingSenderId: "857579149979",
-    appId: "1:857579149979:web:90035e4ed46bb11bdd043e"
-  },
+  // Cloudflare Worker backend API URL
+  // Example: "https://note-pilot-api.YOUR-SUBDOMAIN.workers.dev"
+  // When running locally, defaults automatically to "http://localhost:8787" if left empty.
+  apiUrl: "https://note-pilot-api.hannsraaz.workers.dev",
+
+  // Google Drive OAuth Client ID (Public Web Client ID)
   googleDrive: {
-    clientId: "186193829621-jsn94hd28qkejoaef0rog5i8avlusut3.apps.googleusercontent.com"
+    clientId: "186193829621-2ludp1od1tn7vbikenpgomhfd8kl33kc.apps.googleusercontent.com"
   },
+
   app: {
     name: "NotePilot",
     supportEmail: "support@example.com",

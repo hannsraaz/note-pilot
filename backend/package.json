@@ -1,0 +1,23 @@
+{
+  "name": "note-pilot-api",
+  "version": "1.0.0",
+  "description": "Secure serverless backend for NotePilot hosted on Cloudflare Workers",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "serverless",
+    "firebase",
+    "security"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.109.2"
+  }
+}
