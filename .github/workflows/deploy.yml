@@ -31,7 +31,7 @@ jobs:
       - name: Prepare static assets
         run: |
           mkdir -p _site
-          cp -r assets css js docs *.html _site/
+          cp -r css js docs *.html _site/
           # Ensure .nojekyll is present so assets and dotfiles are not ignored by Jekyll
           touch _site/.nojekyll
 
