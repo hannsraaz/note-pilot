@@ -44,12 +44,23 @@ export async function loadRemoteConfig() {
 export function getConfigWarnings() {
   const warnings = [];
   const host = window.location.hostname;
+  let isExamplePlaceholderHost = false;
+
+  if (config.apiUrl) {
+    try {
+      const apiHost = new URL(config.apiUrl).hostname;
+      isExamplePlaceholderHost =
+        apiHost === "example.com" || apiHost.endsWith(".example.com");
+    } catch (_) {
+      isExamplePlaceholderHost = false;
+    }
+  }
 
   // On GitHub Pages or production, if apiUrl is still the dummy placeholder
   if (
     host !== "localhost" &&
     host !== "127.0.0.1" &&
-    (!config.apiUrl || config.apiUrl.includes("YOUR-SUBDOMAIN") || config.apiUrl.includes("example.com"))
+    (!config.apiUrl || config.apiUrl.includes("YOUR-SUBDOMAIN") || isExamplePlaceholderHost)
   ) {
     warnings.push("Cloudflare Worker API URL is not configured. Update js/env.js with your deployed Worker endpoint.");
   }
